@@ -1,6 +1,9 @@
+
 // Get references to the search input and item list
-const searchInput = document.getElementById('searchInput');
-const itemList = document.getElementById('itemList');
+const chatMessages = document.getElementById('chatMessages');
+const userInput = document.getElementById('userInput');
+const sendButton = document.getElementById('sendButton');
+
 
 const messages = []
 
@@ -37,8 +40,6 @@ async function* getAllEmails() {
     }
 }
 
-
-
 let messagesProcessed = false;
 async function processEmails() {
     for await (const message of getAllEmails()) {
@@ -50,24 +51,47 @@ async function processEmails() {
 
 processEmails();
 
+async function addMessage(content, isUser) {
+    while (!messagesProcessed) {
+        await setTimeout(1000);
+        console.log("hi")
+    }
+    const messageDiv = document.createElement('div');
+    messageDiv.classList.add('message');
+    messageDiv.classList.add(isUser ? 'user-message' : 'bot-message');
+    messageDiv.textContent = content;
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
 
-// Add an event listener to the search input
-searchInput.addEventListener('input', async function () {
-    if (!messagesProcessed) { return; }
-    const searchTerm = searchInput.value.toLowerCase();
-
-    // Loop through all list items
-    let counter = 0;
-    const MAX = 5;
-    itemList.innerHTML = ""
-    for (const message of messages) {
-        if (message.subject.includes(searchTerm)) {
-            counter += 1
-            const item = document.createElement("li")
-            item.innerHTML = message.subject
-            itemList.appendChild(item)
+async function handleSend() {
+    const message = userInput.value.trim();
+    if (message) {
+        await addMessage(message, true);
+        userInput.value = '';
+        // Here you would typically send the message to an AI service
+        // and get a response. For this example, we'll just echo the message.
+        const firstMessages = []
+        for (const mail of messages) {
+            if (mail.subject.includes(message)) {
+                firstMessages.push(mail.subject);
+            }
+            if (firstMessages.length == 5)
+                break;
         }
-        if (counter == MAX)
-            break;
+        const text = "Mails: " + firstMessages.join(", ");
+        console.log(text)
+        addMessage(text, false)
+        /*setTimeout(() => {
+            addMessage(`Mails: ${wmessage}`, false);
+        }, 1000); */
+    }
+}
+
+sendButton.addEventListener('click', handleSend);
+userInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
     }
 });
