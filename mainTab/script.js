@@ -5,8 +5,6 @@ const userInput = document.getElementById('userInput');
 const sendButton = document.getElementById('sendButton');
 
 
-const messages = []
-
 async function* getAllEmails() {
     // Get all accounts
     let accounts = await messenger.accounts.list();
@@ -24,7 +22,6 @@ async function* getAllEmails() {
 
             // Process messages in the first page
             for (let message of page.messages) {
-                messages.push(message)
                 yield message;
             }
 
@@ -40,13 +37,50 @@ async function* getAllEmails() {
     }
 }
 
+const messages = []
 let messagesProcessed = false;
 async function processEmails() {
+    const batch_size = 1;
+    let batch = [];
+    const promises = [];
     for await (const message of getAllEmails()) {
         messages.push(message);
+        promises.push(processEmail(message));
     }
-    messages.reverse()
+    await Promise.all(promises);
+    console.log("Finished")
+    console.log(messages);
+    const API_UPDATE_MAILS_LINK = "http://localhost:8080/initialize"
+    res = await fetch(API_UPDATE_MAILS_LINK, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json", // Specify JSON content type
+        },
+        body: JSON.stringify(messages), // Convert data to JSON string
+    });
+    if (!res.ok) {
+        console.log("oh no")
+    }
     messagesProcessed = true;
+}
+
+async function processEmail(message) {
+    const fullMessage = await messenger.messages.getFull(message.id);
+    message["content"] = ""
+    for (const part of fullMessage.parts) {
+        if (!Object.hasOwn(part, "body")) {
+            continue;
+        }
+        message["content"] += part.body.trim() + "\n\n\n"
+    }
+    message["sender"] = message["author"]
+    message["datetime"] = message["date"]
+    const necessaryKeys = ["id", "sender", "datetime", "subject", "content"]
+    Object.keys(message).forEach(key => {
+        if (!necessaryKeys.includes(key)) {
+          delete message[key];
+        }
+    });
 }
 
 processEmails();
@@ -65,7 +99,25 @@ async function addMessage(content, isUser) {
 }
 
 async function handleSend() {
-    const message = userInput.value.trim();
+    while (!messagesProcessed) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    Promise.all(promises);
+    promises = [];
+    const input = userInput.value.trim();
+    const API_QUERY_LINK = "http://localhost:8080/chat"
+    if (input) {
+        const res = await fetch(API_QUERY_LINK, { headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            message: input,
+        })});
+        add(res, false);
+    }
+    
+    /*
     if (message) {
         await addMessage(message, true);
         userInput.value = '';
@@ -82,10 +134,8 @@ async function handleSend() {
         const text = "Mails: " + firstMessages.join(", ");
         console.log(text)
         addMessage(text, false)
-        /*setTimeout(() => {
-            addMessage(`Mails: ${wmessage}`, false);
-        }, 1000); */
     }
+    */
 }
 
 sendButton.addEventListener('click', handleSend);
